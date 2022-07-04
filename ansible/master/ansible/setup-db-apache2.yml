@@ -1,0 +1,61 @@
+---
+- hosts: web
+  tasks:
+    - name: Install Apache2
+      apt: name=apache2 state=present update_cache=yes
+      become: true
+
+  #  - name: Service start apache2
+   #   service:
+     #   name: apache2
+    #    state: started
+    - name: Template a file to /etc/file.conf
+      template:
+        src: /mytemplates/index.html
+        dest: /var/www/html/index.html
+        owner: www-data
+        group: www-data
+        mode: '0644'
+
+    - name: Set 80 to 8080 PORTS (/etc/apache2/ports.conf)
+      lineinfile:
+        path: /etc/apache2/ports.conf
+        regexp: 'Listen 80'
+        line: Listen 8080
+        owner: root
+        group: root
+        mode: '0644'
+    - name: Set 80 to 8080 PORTS (/etc/apache2/sites-enabled/000-default.conf)
+      lineinfile:
+        path: /etc/apache2/sites-enabled/000-default.conf
+        regexp: '<VirtualHost \*:80(80)?>'
+        line: <VirtualHost *:8080>
+        owner: root
+        group: root
+        mode: '0644'
+        state: present
+    - name: Add user (app)
+      user:
+        name: app
+        password: $6$mysecretsalt$WSQqhdyjtEe0.x5NK49ovB7qgDJoLY2j21da8wlLvj7YzTk4pmKbwRRICSMaN56U9cCBJOzF2JyAD/0T1D6CL/
+        state: present
+        generate_ssh_key: True
+
+    - name: Set authorized key in alternate location
+      authorized_key:
+        user: app
+        state: present
+        key: "{{ lookup('file', '/var/ans/app.pub') }}"
+        manage_dir: False
+
+    - name: Service restart apache2
+      service:
+        name: apache2
+        state: started
+
+
+- hosts: db
+  tasks:
+    - name: Install MariaDB
+      apt: name=mariadb-server state=present update_cache=yes
+      become: true
